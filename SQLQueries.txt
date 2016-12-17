@@ -1,0 +1,82 @@
+﻿SELECT Food_Inspections.[Inspection ID], Food_Inspections.[DBA Name], Food_Inspections.[AKA Name]
+FROM Food_Inspections
+WHERE (((Food_Inspections.[AKA Name]) Is Null));
+
+
+UPDATE Food_Inspections
+SET AKA_Name = DBA_Name
+WHERE AKA_Name is null
+
+
+SELECT License_Number, DBA_Name, AKA_Name, Address, City, State, ZIP
+FROM Food_Inspections
+WHERE License_Number  IN 
+(
+
+SELECT License_Number
+FROM
+( SELECT DISTINCT License_Number, DBA_Name
+  FROM Food_Inspections
+  GROUP BY License_Number, DBA_name)
+GROUP BY License_Number
+HAVING count(DBA_Name) >1
+)
+
+INSERT INTO Facility_Type(Facility_Type_Description)
+SELECT DISTINCT Facility_Type FROM Food_Inspections
+
+INSERT INTO Inspection_Type(Inspection_Type_Description)
+SELECT DISTINCT Inspection_Type FROM Food_Inspections
+
+INSERT INTO Business (DBA_Name, AKA_Name,License_Number, Address, City, State, ZIP, Longitude, Latitude)
+SELECT DISTINCT DBA_Name, AKA_Name, License_Number, Address, City, State, Zip, Longitude, Latitude
+FROM Food_Inspections
+GROUP BY DBA_Name, AKA_Name, License_Number, Address, City, State, Zip,Longitude, Latitude
+ORDER BY License_Number
+
+UPDATE Business
+ INNER JOIN Food_Inspections ON
+    Business.DBA_Name = Food_Inspections.DBA_Name
+   AND Business.AKA_Name = Food_Inspections.AKA_Name
+   AND Business.License_Number = Food_Inspections.License_Number
+SET 
+    Business.Facility_Type_Description = Food_Inspections.Facility_Type
+	
+
+UPDATE Business 
+INNER JOIN Facility_Type
+ ON Business.Facility_Type_Description = Facility_Type.Facility_Type_Description
+SET Business.Facility_Type = Facility_Type.Facility_Type_ID
+
+UPDATE Inspections INNER JOIN Food_Inspections ON Inspections.Inspection_ID = Food_Inspections.Inspection_ID
+SET Inspections.Business_Name = Food_Inspections.License_Number + ' '  + Food_Inspections.DBA_Name + ' ' + Food_Inspections.AKA_Name + ' ' + Food_Inspections.Address
+
+
+UPDATE Inspections INNER JOIN Business ON 
+Business.License_Number + ' '  + Business.DBA_Name + ' ' + Business.AKA_Name + ' ' + Business.Address 
+= Inspections.Business_Name
+SET Inspections.Business_ID = Business.Business_ID
+
+UPDATE Inspections INNER JOIN Food_Inspections ON Inspections.Inspection_ID = Food_Inspections.Inspection_ID
+SET Inspections.Inspection_Type_Desc = Food_Inspections.Inspection_Type
+
+UPDATE Inspections INNER JOIN Inspection_Type 
+ON Inspection_Type.Inspection_Type_Description = Inspections.Inspection_Type_Desc
+SET Inspections.Inspection_type =  Inspection_Type.Inspection_Type_ID
+
+
+UPDATE Violation
+SET Violation_ID = Left([Violation_Desc],InStr([Violation_Desc],". ")-1)
+
+UPDATE Violation
+SET Violation_Desc = Right([Violation_Desc],Len([Violation_Desc])-InStr([Violation_Desc],". "))
+UPDATE Inspections
+SET Violation_ID = Left([Violations],InStr([Violations],". ")-1)
+WHERE Violations IS NOT NULL
+
+
+UPDATE Inspections
+SET Violation_ID = Left([Violations],InStr([Violations],". ")-1),
+       Comments = Right([Violations],Len([Violations])-InStr([Violations],"- Comments: "))
+WHERE Violations IS NOT NULL
+
